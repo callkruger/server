@@ -1,0 +1,158 @@
+version: '3.7'
+
+services:
+
+  ### MYSQL #################################################
+  mysql:
+    container_name: mysql
+    restart:        always
+    command:        --default-authentication-plugin=mysql_native_password
+    build:
+      context:    ${IMAGE_PATH}/mysql
+      dockerfile: Dockerfile
+      args:
+        - MYSQL_VERSION=${MYSQL_VERSION}
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    volumes:
+      - ${DATA_PATH}/mysql:/var/lib/mysql
+      - ${IMAGE_PATH}/mysql/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+    ports:
+      - "${MYSQL_PORT}:${MYSQL_PORT}"
+    expose:
+      - "${MYSQL_PORT}"
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - backend
+
+  ### POSTGRES ##############################################
+  postgres:
+    container_name: postgres
+    restart:        always
+    build:
+      context:    ${IMAGE_PATH}/postgres
+      dockerfile: Dockerfile
+      args:
+        - POSTGRES_VERSION=${POSTGRES_VERSION}
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ${DATA_PATH}/postgres:/var/lib/postgresql
+      - ${IMAGE_PATH}/postgres/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+    ports:
+      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+    expose:
+      - "${POSTGRES_PORT}"
+    networks:
+      - backend
+
+  ### REDIS #################################################
+  redis:
+    container_name: redis
+    restart:        always
+    build:
+      context:    ${IMAGE_PATH}/redis
+      dockerfile: Dockerfile
+      args:
+        - REDIS_VERSION=${REDIS_VERSION}
+    volumes:
+      - ${DATA_PATH}/redis:/var/lib/redis
+    ports:
+      - "${REDIS_PORT}:${REDIS_PORT}"
+    expose:
+      - "${REDIS_PORT}"
+    sysctls:
+      - net.core.somaxconn=511
+    networks:
+      - backend
+
+  ### PHP_FPM ###############################################
+  php-fpm:
+    container_name: php-fpm
+    restart:        always
+    build:
+      context:    ${IMAGE_PATH}/php/workspace
+      dockerfile: Dockerfile
+      args:
+        - PHP_VERSION=${PHP_VERSION}
+        - PHP_VERSION_TAG=${PHP_VERSION_TAG}
+        - PHP_EXTENSION_ZIP=${PHP_EXTENSION_ZIP}
+        - PHP_EXTENSION_OCI8=${PHP_EXTENSION_OCI8}
+        - PHP_EXTENSION_MSSQL=${PHP_EXTENSION_MSSQL}
+        - PHP_EXTENSION_GETTEXT=${PHP_EXTENSION_GETTEXT}
+        - PHP_EXTENSION_GHOSTSCRIPT=${PHP_EXTENSION_GHOSTSCRIPT}
+        - PHP_EXTENSION_IMAGEOPTIMIZERS=${PHP_EXTENSION_IMAGEOPTIMIZERS}
+        - PHP_EXTENSION_IMAGICK=${PHP_EXTENSION_IMAGICK}
+        - PHP_EXTENSION_APCU=${PHP_EXTENSION_APCU}
+        - PHP_EXTENSION_GRPC=${PHP_EXTENSION_GRPC}
+        - PHP_EXTENSION_BCMATH=${PHP_EXTENSION_BCMATH}
+        - PHP_EXTENSION_OPCACHE=${PHP_EXTENSION_OPCACHE}
+        - PHP_EXTENSION_CACHETOOL=${PHP_EXTENSION_CACHETOOL}
+        - PHP_EXTENSION_SWOOLE=${PHP_EXTENSION_SWOOLE}
+        - PHP_EXTENSION_REDIS=${PHP_EXTENSION_REDIS}
+        - WORKSPACE_INSTALL_PYTHON=${WORKSPACE_INSTALL_PYTHON}
+        - WORKSPACE_INSTALL_SUPERVISOR=${WORKSPACE_INSTALL_SUPERVISOR}
+        - WORKSPACE_INSTALL_NODE=${WORKSPACE_INSTALL_NODE}
+        - http_proxy
+        - https_proxy
+        - no_proxy
+    volumes:
+      - ${CODE_PATH}:${CONTAINER_CODE_PATH}${CONTAINER_CODE_FLAG}
+      - ${CONFIG_PATH}/php/php.ini:/usr/local/etc/php/php.ini
+      - ${CONFIG_PATH}/php/supervisord.d/:/etc/supervisord.d
+    expose:
+      - "9000"
+    networks:
+      - backend
+
+  ### NGINX #################################################
+  nginx:
+    container_name: nginx
+    restart:        always
+    build:
+      context:    ${IMAGE_PATH}/nginx
+      dockerfile: Dockerfile
+      args:
+        - NGINX_VERSION=${NGINX_VERSION}
+        - PHP_UPSTREAM_CONTAINER=${NGINX_PHP_UPSTREAM_CONTAINER}
+        - NGINX_PHP_UPSTREAM_PORT=${NGINX_PHP_UPSTREAM_PORT}
+        - http_proxy
+        - https_proxy
+        - no_proxy
+    volumes:
+      - ${CODE_PATH}:${CONTAINER_CODE_PATH}${CONTAINER_CODE_FLAG}
+      - ${LOGS_PATH}/nginx/:/var/log/nginx
+      - ${CONFIG_PATH}/nginx/sites/:/etc/nginx/sites-available
+      - ${CONFIG_PATH}/nginx/ssl/:/etc/nginx/ssl
+    ports:
+      - "${NGINX_PORT}:${NGINX_PORT}"
+      - "${NGINX_PORT_SSL}:${NGINX_PORT_SSL}"
+    depends_on:
+      - php-fpm
+    networks:
+      - frontend
+      - backend
+
+networks:
+  frontend:
+    driver: ${NETWORKS_DRIVER}
+  backend:
+    driver: ${NETWORKS_DRIVER}
+
+volumes:
+  mysql:
+    driver: ${VOLUMES_DRIVER}
+  postgres:
+    driver: ${VOLUMES_DRIVER}
+  redis:
+    driver: ${VOLUMES_DRIVER}
+  php-fpm:
+    driver: ${VOLUMES_DRIVER}
+  nginx:
+    driver: ${VOLUMES_DRIVER}
