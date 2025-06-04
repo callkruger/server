@@ -9,7 +9,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 # APT GET INIT
 ###########################################################################
 RUN apt-get update \
-    && pecl php-dev php-pear
+    && apt-get install -y --no-install-recommends php-dev php-pear
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     autoconf build-essential apt-utils zlib1g-dev libzip-dev unzip zip libpq-dev
